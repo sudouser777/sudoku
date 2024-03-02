@@ -1,4 +1,4 @@
-## Sudoku Puzzle Solver GUI Application
+## Sudoku Puzzle GUI Application
 
 This is a simple Sudoku puzzle solver GUI application built using wxPython, a Python wrapper for the wxWidgets toolkit. The application allows users to play Sudoku puzzles by entering numbers into a grid. It includes features such as:
 
