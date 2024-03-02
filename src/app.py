@@ -1,6 +1,8 @@
 import wx
 from wx import TextCtrl
 
+from validator import SudokuValidator
+
 
 class SudokuPanel(wx.Panel):
 
@@ -8,8 +10,9 @@ class SudokuPanel(wx.Panel):
         super().__init__(parent)
         self.rows = rows
         self.cols = cols
-        self.grid = wx.GridSizer(rows, cols, 2, 2)
-        self.grid_cells = []
+        self.grid_sizer = wx.GridSizer(rows, cols, 2, 2)
+        self.grid = []
+        self.validator = SudokuValidator(self.grid)
         self.actions = {wx.WXK_LEFT: (0, -1), wx.WXK_RIGHT: (0, 1), wx.WXK_UP: (-1, 0), wx.WXK_DOWN: (1, 0)}
 
         for _ in range(rows):
@@ -17,46 +20,67 @@ class SudokuPanel(wx.Panel):
             for _ in range(cols):
                 cell = self.create_number_placeholder()
                 cells.append(cell)
-                self.grid.Add(cell, 1, wx.EXPAND | wx.ALL | wx.CENTER)
-            self.grid_cells.append(cells)
+                self.grid_sizer.Add(cell, 1, wx.EXPAND | wx.ALL | wx.CENTER)
+            self.grid.append(cells)
 
-        self.SetSizer(self.grid)
-        self.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
+        self.SetSizer(self.grid_sizer)
 
     def create_number_placeholder(self):
-        text_ctrl = wx.TextCtrl(self)
-        text_ctrl.is_invalid_input = False
+        text_ctrl = wx.TextCtrl(self, style=wx.TE_NOHIDESEL)
         text_ctrl.SetMaxLength(1)
         text_ctrl.SetBackgroundColour('white')
-        text_ctrl.Bind(wx.EVT_TEXT, self.on_text_change, text_ctrl)
+        text_ctrl.Bind(wx.EVT_CHAR, self.on_char_change)
         text_ctrl.SetFont(wx.Font(30, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        text_ctrl.SetValue('')
+        text_ctrl.ShowNativeCaret(False)
         return text_ctrl
 
-    def on_text_change(self, event):
-        number_cell: TextCtrl = event.GetEventObject()
-        number: str = event.GetString()
-        if number.isdigit() and 0 < int(number) < 10:
-            number_cell.is_invalid_input = False
-        else:
-            number_cell.is_invalid_input = True
-        event.Skip()
-
-    def on_key_press(self, event):
+    def on_char_change(self, event):
+        current_cell: TextCtrl = event.GetEventObject()
         keycode = event.GetKeyCode()
 
         if keycode in self.actions:
-            row, col = self.get_cell_index(keycode, self.FindFocus())
-            if row is not None and col is not None:
-                self.grid_cells[row][col].SetFocus()
+            self.on_key_press(keycode)
+            return event.Skip()
+
+        if keycode == wx.WXK_BACK:
+            current_cell.SetValue('')
+            current_cell.SetBackgroundColour('white')
+
+            if self.validator.is_valid():
+                self.reset_color()
+                current_cell.SetFocus()
+
+            return event.Skip()
+
+        if chr(keycode).isdigit():
+            current_cell.SetValue(chr(keycode))
+            row, col = self.get_cell_index(self.FindFocus())
+            if row is not None and col is not None and not self.validator.is_valid_cell(row, col, chr(keycode)):
+                current_cell.SetBackgroundColour('red')
+        else:
+            current_cell.SetValue('')
 
         event.Skip()
 
-    def get_cell_index(self, keycode, current_cell):
+    def reset_color(self):
+        for row in self.grid:
+            for cell in row:
+                cell.SetFocus()
+                cell.SetBackgroundColour('white')
+
+    def on_key_press(self, keycode):
+        row, col = self.get_cell_index(self.FindFocus())
+        if row is not None and col is not None:
+            x, y = self.actions[keycode]
+            row, col = (row + x) % self.rows, (col + y) % self.cols
+            self.grid[row][col].SetFocus()
+
+    def get_cell_index(self, current_cell):
         for row_idx in range(self.rows):
             for col_idx in range(self.cols):
-                if self.grid_cells[row_idx][col_idx] == current_cell:
-                    x, y = self.actions[keycode]
-                    return (row_idx + x) % self.rows, (col_idx + y) % self.cols
+                if self.grid[row_idx][col_idx] == current_cell:
+                    return row_idx, col_idx
         return None, None
 
 
