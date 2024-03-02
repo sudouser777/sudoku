@@ -33,14 +33,7 @@ class SudokuValidator:
         return True
 
     def is_valid_group(self, group):
-        seen = set()
-        for cell in group:
-            value = cell.GetValue()
-            if value in seen:
-                return False
-            if value != '':
-                seen.add(value)
-        return True
+        return len(set(value for cell in group if (value := cell.GetValue()) != '')) == self.size
 
     def is_valid_cell(self, row_idx, col_idx, value):
         if any(value in cell.GetValue() for idx, cell in enumerate(self.grid[row_idx]) if idx != col_idx):

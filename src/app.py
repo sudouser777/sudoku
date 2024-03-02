@@ -1,3 +1,5 @@
+from random import sample
+
 import wx
 from wx import TextCtrl
 
@@ -14,6 +16,7 @@ class SudokuPanel(wx.Panel):
         self.grid = []
         self.validator = SudokuValidator(self.grid)
         self.actions = {wx.WXK_LEFT: (0, -1), wx.WXK_RIGHT: (0, 1), wx.WXK_UP: (-1, 0), wx.WXK_DOWN: (1, 0)}
+        self.SetBackgroundColour(wx.BLACK)
 
         for _ in range(rows):
             cells = []
@@ -22,17 +25,42 @@ class SudokuPanel(wx.Panel):
                 cells.append(cell)
                 self.grid_sizer.Add(cell, 1, wx.EXPAND | wx.ALL | wx.CENTER)
             self.grid.append(cells)
+        self.generate_sudoku_puzzle()
+        self.SetSizerAndFit(self.grid_sizer)
 
-        self.SetSizer(self.grid_sizer)
+    def generate_sudoku_puzzle(self):
+        side = self.rows
+        base = int(side ** 0.5)
+
+        def pattern(r, c):
+            return (base * (r % base) + r // base + c) % side
+
+        def shuffle(s):
+            return sample(s, len(s))
+
+        r_base = range(base)
+        rows = [g * base + r for g in shuffle(r_base) for r in shuffle(r_base)]
+        cols = [g * base + c for g in shuffle(r_base) for c in shuffle(r_base)]
+        nums = shuffle(range(1, base * base + 1))
+
+        board = [[nums[pattern(r, c)] for c in cols] for r in rows]
+
+        empties = (side ** 2) // 2
+        for p in sample(range(side ** 2), empties):
+            board[p // side][p % side] = 0
+
+        for row_idx in range(side):
+            for col_idx in range(side):
+                if (value := board[row_idx][col_idx]) != 0:
+                    self.grid[row_idx][col_idx].SetValue(str(value))
 
     def create_number_placeholder(self):
         text_ctrl = wx.TextCtrl(self, style=wx.TE_NOHIDESEL)
         text_ctrl.SetMaxLength(1)
-        text_ctrl.SetBackgroundColour('white')
+        text_ctrl.SetBackgroundColour(wx.WHITE)
         text_ctrl.Bind(wx.EVT_CHAR, self.on_char_change)
         text_ctrl.SetFont(wx.Font(30, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        text_ctrl.SetValue('')
-        text_ctrl.ShowNativeCaret(False)
+        text_ctrl.SetLabelText('')
         return text_ctrl
 
     def on_char_change(self, event):
@@ -45,7 +73,7 @@ class SudokuPanel(wx.Panel):
 
         if keycode == wx.WXK_BACK:
             current_cell.SetValue('')
-            current_cell.SetBackgroundColour('white')
+            current_cell.SetBackgroundColour(wx.WHITE)
 
             if self.validator.is_valid():
                 self.reset_color()
@@ -53,13 +81,21 @@ class SudokuPanel(wx.Panel):
 
             return event.Skip()
 
+        current_cell.SetBackgroundColour(wx.WHITE)
         if chr(keycode).isdigit():
             current_cell.SetValue(chr(keycode))
             row, col = self.get_cell_index(self.FindFocus())
             if row is not None and col is not None and not self.validator.is_valid_cell(row, col, chr(keycode)):
-                current_cell.SetBackgroundColour('red')
+                current_cell.SetBackgroundColour(wx.RED)
         else:
             current_cell.SetValue('')
+
+        if self.validator.is_valid():
+            wx.MessageBox(
+                "Congratulations! You have solved the puzzle!",
+                "Congratulations",
+                wx.OK | wx.ICON_INFORMATION
+            )
 
         event.Skip()
 
@@ -67,7 +103,7 @@ class SudokuPanel(wx.Panel):
         for row in self.grid:
             for cell in row:
                 cell.SetFocus()
-                cell.SetBackgroundColour('white')
+                cell.SetBackgroundColour(wx.WHITE)
 
     def on_key_press(self, keycode):
         row, col = self.get_cell_index(self.FindFocus())
